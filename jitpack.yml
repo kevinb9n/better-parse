@@ -1,0 +1,6 @@
+jdk:
+  - openjdk17
+before_install:
+  - echo "signing.skip=true" >> ~/.gradle/gradle.properties
+install:
+  - ./gradlew publishJvmPublicationToMavenLocal -x sign -Psigning.skip=true
