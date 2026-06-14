@@ -21,8 +21,9 @@ kotlin {
     }
 
     jvm {
-        compilations["main"].apply {
-            kotlinOptions.jvmTarget = "1.8"
+        compilations.all {
+            @Suppress("DEPRECATION")
+            kotlinOptions.jvmTarget = "11"
         }
 
         compilations["test"].defaultSourceSet.dependencies {
