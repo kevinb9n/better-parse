@@ -191,7 +191,9 @@ publishing {
 
         // Signing requires that
         // `signing.keyId`, `signing.password`, and `signing.secretKeyRingFile` are provided as Gradle properties
-        signing.sign(this@all)
+        if (project.hasProperty("signing.keyId")) {
+            signing.sign(this@all)
+        }
     }
 }
 
