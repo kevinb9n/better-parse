@@ -1,5 +1,5 @@
 import org.apache.tools.ant.taskdefs.condition.Os
-import org.jetbrains.kotlin.gradle.plugin.mpp.AbstractKotlinNativeTargetPreset
+import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
 import java.net.URI
 
 plugins {
@@ -34,11 +34,12 @@ kotlin {
             implementation(kotlin("test-junit"))
         }
         compilations.all {
-            kotlinOptions.jvmTarget = "1.6"
+            @Suppress("DEPRECATION")
+            kotlinOptions.jvmTarget = "11"
         }
     }
 
-    js(BOTH) {
+    js(IR) {
         browser()
         nodejs()
 
@@ -46,15 +47,25 @@ kotlin {
             implementation(kotlin("test-js"))
         }
         compilations.all {
+            @Suppress("DEPRECATION")
             kotlinOptions.moduleKind = "umd"
         }
     }
 
-    presets.withType<AbstractKotlinNativeTargetPreset<*>>().forEach {
-        targetFromPreset(it) {
-            compilations.getByName("main") {
-                defaultSourceSet.dependsOn(sourceSets["nativeMain"])
-            }
+    // Explicit native targets replacing the removed presets API.
+    // Wire each native target's main compilation to the nativeMain source set.
+    val nativeTargets = listOf(
+        linuxX64(), linuxArm64(),
+        macosX64(), macosArm64(),
+        iosX64(), iosArm64(), iosSimulatorArm64(),
+        watchosX64(), watchosArm64(), watchosSimulatorArm64(),
+        tvosX64(), tvosArm64(), tvosSimulatorArm64(),
+        mingwX64()
+    )
+    val nativeMainSourceSet = sourceSets["nativeMain"]
+    nativeTargets.forEach { target ->
+        target.compilations.getByName("main") {
+            defaultSourceSet.dependsOn(nativeMainSourceSet)
         }
     }
 }
@@ -82,7 +93,7 @@ kotlin.sourceSets.commonMain {
 
 //region Publication
 
-val publicationsFromWindows = listOf("mingwX64", "mingwX86")
+val publicationsFromWindows = listOf("mingwX64")
 
 val publicationsFromMacos =
     kotlin.targets.names.filter {

@@ -23,8 +23,8 @@ kotlin {
         kotlin.targets.withType<KotlinNativeTarget>().all {
             compilations.getByName("main") {
                 defaultSourceSet.dependsOn(nativeMain)
-                binaries.executable { }
             }
+            binaries.executable { }
         }
     }
 }
