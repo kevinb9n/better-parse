@@ -2,3 +2,7 @@ jdk:
   - openjdk17
 install:
   - ./gradlew publishJvmPublicationToMavenLocal
+  - ./gradlew publishJsPublicationToMavenLocal
+  - ./gradlew publishLinuxX64PublicationToMavenLocal
+  - ./gradlew publishLinuxArm64PublicationToMavenLocal
+  - ./gradlew publishKotlinMultiplatformPublicationToMavenLocal
