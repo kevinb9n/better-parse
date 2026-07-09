@@ -63,8 +63,8 @@ private class CompletionAnalyzer(private val tokens: TokenMatchesSequence) {
         }
 
     private fun completeAnd(combinator: AndCombinator<*>, fromPosition: Int): Outcome {
-        var nextPosition = fromPosition
-        var aggregate = Outcome.failure(fromPosition)
+        var positions = setOf(fromPosition)
+        var aggregate = Outcome.empty()
         for (consumer in combinator.consumersImpl) {
             val parser =
                 when (consumer) {
@@ -72,12 +72,12 @@ private class CompletionAnalyzer(private val tokens: TokenMatchesSequence) {
                     is SkipParser -> consumer.innerParser
                     else -> throw IllegalArgumentException()
                 }
-            val outcome = complete(parser, nextPosition)
-            aggregate = aggregate.merge(outcome)
-            if (!outcome.accepts) return aggregate.withoutAcceptance()
-            nextPosition = outcome.nextPosition
+            val outcomes = positions.map { complete(parser, it) }
+            aggregate = outcomes.fold(aggregate) { acc, outcome -> acc.mergeExpected(outcome) }
+            positions = outcomes.flatMap { it.acceptedPositions }.toSet()
+            if (positions.isEmpty()) return aggregate
         }
-        return aggregate.merge(Outcome.success(nextPosition))
+        return aggregate.merge(Outcome.success(positions))
     }
 
     private fun completeOr(combinator: OrCombinator<*>, fromPosition: Int): Outcome {
@@ -96,23 +96,24 @@ private class CompletionAnalyzer(private val tokens: TokenMatchesSequence) {
     }
 
     private fun completeRepeat(combinator: RepeatCombinator<*>, fromPosition: Int): Outcome {
-        var nextPosition = fromPosition
+        var positions = setOf(fromPosition)
         var count = 0
-        var aggregate = Outcome.failure(fromPosition)
+        var aggregate = Outcome.empty()
         while (combinator.atMost == -1 || count < combinator.atMost) {
-            val outcome = complete(combinator.parser, nextPosition)
-            aggregate = aggregate.merge(outcome)
-            if (!outcome.accepts || outcome.nextPosition == nextPosition) {
+            val outcomes = positions.map { complete(combinator.parser, it) }
+            aggregate = outcomes.fold(aggregate) { acc, outcome -> acc.mergeExpected(outcome) }
+            val nextPositions = outcomes.flatMap { it.acceptedPositions }.toSet()
+            if (nextPositions.isEmpty() || nextPositions == positions) {
                 return if (count >= combinator.atLeast) {
-                    aggregate.merge(Outcome.success(nextPosition))
+                    aggregate.merge(Outcome.success(positions))
                 } else {
                     aggregate
                 }
             }
-            nextPosition = outcome.nextPosition
+            positions = nextPositions
             count++
         }
-        return aggregate.merge(Outcome.success(nextPosition))
+        return aggregate.merge(Outcome.success(positions))
     }
 
     private fun completeSeparated(combinator: SeparatedCombinator<*, *>, fromPosition: Int): Outcome {
@@ -122,19 +123,21 @@ private class CompletionAnalyzer(private val tokens: TokenMatchesSequence) {
             return if (combinator.acceptZero) aggregate.merge(Outcome.success(fromPosition)) else aggregate
         }
 
-        var nextPosition = first.nextPosition
-        while (true) {
-            val separator = complete(combinator.separatorParser, nextPosition)
-            aggregate = aggregate.merge(separator)
-            if (!separator.accepts) return aggregate.merge(Outcome.success(nextPosition))
+        var termPositions = first.acceptedPositions
+        while (termPositions.isNotEmpty()) {
+            aggregate = aggregate.merge(Outcome.success(termPositions))
+            val separatorOutcomes = termPositions.map { complete(combinator.separatorParser, it) }
+            aggregate = separatorOutcomes.fold(aggregate) { acc, outcome -> acc.mergeExpected(outcome) }
+            val separatorPositions = separatorOutcomes.flatMap { it.acceptedPositions }.toSet()
+            if (separatorPositions.isEmpty()) return aggregate
 
-            val term = complete(combinator.termParser, separator.nextPosition)
-            aggregate = aggregate.merge(term)
-            if (!term.accepts) return aggregate.merge(Outcome.success(nextPosition))
-
-            if (term.nextPosition == nextPosition) return aggregate.merge(Outcome.success(nextPosition))
-            nextPosition = term.nextPosition
+            val termOutcomes = separatorPositions.map { complete(combinator.termParser, it) }
+            aggregate = termOutcomes.fold(aggregate) { acc, outcome -> acc.mergeExpected(outcome) }
+            val nextTermPositions = termOutcomes.flatMap { it.acceptedPositions }.toSet()
+            if (nextTermPositions.isEmpty() || nextTermPositions == termPositions) return aggregate
+            termPositions = nextTermPositions
         }
+        return aggregate
     }
 
     private fun completeFallback(parser: Parser<*>, fromPosition: Int): Outcome =
@@ -145,38 +148,49 @@ private class CompletionAnalyzer(private val tokens: TokenMatchesSequence) {
 }
 
 private data class Outcome(
-    val accepts: Boolean,
-    val nextPosition: Int,
+    val acceptedPositions: Set<Int>,
     val expectedByPosition: Map<Int, Set<Token>>
 ) {
+    val accepts: Boolean
+        get() = acceptedPositions.isNotEmpty()
+
     fun merge(other: Outcome): Outcome {
-        val farthest = maxOf(farthestPosition(), other.farthestPosition())
         return Outcome(
-            accepts && nextPosition == farthest || other.accepts && other.nextPosition == farthest,
-            farthest,
-            mapOf(farthest to (tokensAt(farthest) + other.tokensAt(farthest))).filterValues { it.isNotEmpty() }
+            acceptedPositions + other.acceptedPositions,
+            mergeExpectedMaps(expectedByPosition, other.expectedByPosition)
+        )
+    }
+
+    fun mergeExpected(other: Outcome): Outcome {
+        return Outcome(
+            acceptedPositions,
+            mergeExpectedMaps(expectedByPosition, other.expectedByPosition)
         )
     }
 
     fun toResult(): CompletionResult {
         val farthest = farthestPosition()
-        return CompletionResult(accepts && nextPosition == farthest, tokensAt(farthest), farthest)
+        return CompletionResult(farthest in acceptedPositions, tokensAt(farthest), farthest)
     }
 
-    fun withoutAcceptance(): Outcome = copy(accepts = false)
+    private fun farthestPosition(): Int = allPositions().maxOrNull() ?: 0
 
-    private fun farthestPosition(): Int = maxOf(nextPosition, expectedByPosition.keys.maxOrNull() ?: nextPosition)
+    private fun allPositions(): Set<Int> = acceptedPositions + expectedByPosition.keys
 
     private fun tokensAt(position: Int): Set<Token> = expectedByPosition[position].orEmpty()
 
     companion object {
-        fun success(position: Int): Outcome = Outcome(true, position, emptyMap())
+        fun empty(): Outcome = Outcome(emptySet(), emptyMap())
 
-        fun failure(position: Int): Outcome = Outcome(false, position, emptyMap())
+        fun success(position: Int): Outcome = success(setOf(position))
+
+        fun success(positions: Set<Int>): Outcome = Outcome(positions, emptyMap())
+
+        fun failure(position: Int): Outcome = Outcome(emptySet(), emptyMap())
 
         fun fromError(error: ErrorResult, position: Int): Outcome {
             val expected = expectedTokens(error)
-            return if (expected.isEmpty()) failure(position) else Outcome(false, position, mapOf(position to expected))
+            return if (expected.isEmpty()) failure(position) else Outcome(emptySet(), mapOf(position to expected))
         }
 
         private fun expectedTokens(error: ErrorResult): Set<Token> =
@@ -186,5 +200,12 @@ private data class Outcome(
                 is AlternativesFailure -> error.errors.flatMap { expectedTokens(it) }.toSet()
                 else -> emptySet()
             }
+
+        private fun mergeExpectedMaps(
+            left: Map<Int, Set<Token>>,
+            right: Map<Int, Set<Token>>
+        ): Map<Int, Set<Token>> =
+            (left.keys + right.keys).associateWith { left[it].orEmpty() + right[it].orEmpty() }
+                .filterValues { it.isNotEmpty() }
     }
 }

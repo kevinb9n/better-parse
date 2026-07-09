@@ -53,7 +53,7 @@ class CompletionTest : Grammar<Nothing>() {
     @Test fun separatedTermAfterSeparator() {
         val completion = separatedTerms(a, comma).completionAtEnd(tokenizer.tokenize("a,"))
 
-        assertTrue(completion.acceptsEnd)
+        assertFalse(completion.acceptsEnd)
         assertEquals(setOf(a), completion.expectedTokens)
     }
 
