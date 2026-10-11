@@ -20,7 +20,7 @@ var assembleWeb = task<Sync>("assembleWeb") {
         }
     })
 
-    from(main.compileKotlinTaskProvider.flatMap { it.destinationDirectory })
+    from(main.compileTaskProvider.flatMap { it.destinationDirectory })
     from(kotlin.sourceSets.main.get().resources) { include("*.html") }
     into(layout.buildDirectory.dir("web"))
 }

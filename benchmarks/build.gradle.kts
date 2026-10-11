@@ -1,3 +1,5 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
 plugins {
     kotlin("multiplatform")
     kotlin("plugin.allopen")
@@ -21,9 +23,8 @@ kotlin {
     }
 
     jvm {
-        compilations.all {
-            @Suppress("DEPRECATION")
-            kotlinOptions.jvmTarget = "11"
+        compilerOptions {
+            jvmTarget.set(JvmTarget.JVM_11)
         }
 
         compilations["test"].defaultSourceSet.dependencies {

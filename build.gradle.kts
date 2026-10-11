@@ -1,5 +1,6 @@
 import org.apache.tools.ant.taskdefs.condition.Os
-import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
+import org.jetbrains.kotlin.gradle.dsl.JsModuleKind
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import java.net.URI
 
 plugins {
@@ -33,9 +34,8 @@ kotlin {
         compilations["test"].defaultSourceSet.dependencies {
             implementation(kotlin("test-junit"))
         }
-        compilations.all {
-            @Suppress("DEPRECATION")
-            kotlinOptions.jvmTarget = "11"
+        compilerOptions {
+            jvmTarget.set(JvmTarget.JVM_11)
         }
     }
 
@@ -46,9 +46,8 @@ kotlin {
         compilations["test"].defaultSourceSet.dependencies {
             implementation(kotlin("test-js"))
         }
-        compilations.all {
-            @Suppress("DEPRECATION")
-            kotlinOptions.moduleKind = "umd"
+        compilerOptions {
+            moduleKind.set(JsModuleKind.MODULE_UMD)
         }
     }
 
