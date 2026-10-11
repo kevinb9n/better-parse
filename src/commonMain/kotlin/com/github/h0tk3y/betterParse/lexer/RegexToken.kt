@@ -1,5 +1,6 @@
 package com.github.h0tk3y.betterParse.lexer
 
+/** Matches a regular expression at the requested input position without modifying a supplied [Regex]. */
 public expect class RegexToken : Token {
     public constructor(name: String?, @Language("RegExp", "", "") patternString: String, ignored: Boolean = false)
     public constructor(name: String?, regex: Regex, ignored: Boolean = false)
