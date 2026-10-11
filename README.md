@@ -3,7 +3,7 @@
 [![Maven Central](https://maven-badges.herokuapp.com/maven-central/com.github.h0tk3y.betterParse/better-parse/badge.svg)](https://maven-badges.herokuapp.com/maven-central/com.github.h0tk3y.betterParse/better-parse)
 [![Gradle build](https://github.com/h0tk3y/better-parse/workflows/Gradle%20build/badge.svg) ](https://github.com/h0tk3y/better-parse/actions?query=workflow%3A%22Gradle+build%22)
 
-A nice parser combinator library for Kotlin JVM, JS, and Multiplatform projects
+A nice parser combinator library for Kotlin JVM, JS, Wasm/JS, and Multiplatform projects
 
 ```kotlin
 val booleanGrammar = object : Grammar<BooleanExpression>() {
@@ -36,6 +36,13 @@ dependencies {
 ```
 
 With multiplatform projects, it's OK to add the dependency just to the `commonMain` source set, or some other source set if you want it for specific parts of the code.
+
+### WebAssembly
+
+The `wasmJs` target supports browsers and Node.js. Add `wasmJs { browser(); nodejs() }`
+to your Kotlin Multiplatform project and keep the library dependency in `commonMain`;
+Gradle selects the Wasm artifact. Wasm regex tokens use Kotlin's `Regex` implementation,
+so supported syntax and anchor behavior can differ from JVM and Native.
 
 ## Tokens ##
 As many other language recognition tools, `better-parse` abstracts away from raw character input by 
