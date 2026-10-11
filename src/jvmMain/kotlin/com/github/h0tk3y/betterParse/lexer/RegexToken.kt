@@ -1,6 +1,5 @@
 package com.github.h0tk3y.betterParse.lexer
 
-import java.util.*
 import java.util.regex.Matcher
 
 public actual class RegexToken private constructor(
@@ -16,20 +15,6 @@ public actual class RegexToken private constructor(
 
     private val matcher: Matcher get() = threadLocalMatcher.get()
 
-    private companion object {
-        private const val inputStartPrefix = "\\A"
-
-        private fun prependPatternWithInputStart(patternString: String, options: Set<RegexOption>) =
-            if (patternString.startsWith(Companion.inputStartPrefix))
-                patternString.toRegex(options)
-            else {
-                val newlineAfterComments = if (RegexOption.COMMENTS in options) "\n" else ""
-                val patternToEmbed = if (RegexOption.LITERAL in options) Regex.escape(patternString) else patternString
-                ("${inputStartPrefix}(?:$patternToEmbed$newlineAfterComments)").toRegex(options - RegexOption.LITERAL)
-            }
-
-    }
-
     public actual constructor(
         name: String?,
         @Language("RegExp", "", "") patternString: String,
@@ -38,7 +23,7 @@ public actual class RegexToken private constructor(
         name,
         ignored,
         patternString,
-        prependPatternWithInputStart(patternString, emptySet())
+        Regex(patternString)
     )
 
     public actual constructor(
@@ -49,13 +34,15 @@ public actual class RegexToken private constructor(
         name,
         ignored,
         regex.pattern,
-        prependPatternWithInputStart(regex.pattern, regex.options)
+        regex
     )
 
     actual override fun match(input: CharSequence, fromIndex: Int): Int {
         matcher.reset(input).region(fromIndex, input.length)
+            .useTransparentBounds(true)
+            .useAnchoringBounds(false)
 
-        if (!matcher.find()) {
+        if (!matcher.lookingAt()) {
             return 0
         }
 

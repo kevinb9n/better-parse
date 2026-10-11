@@ -97,4 +97,12 @@ class FlagsCompatibilityTest {
         val lex = DefaultTokenizer(listOf(a, b))
         assertEquals(listOf(a, b, a, b), lex.tokenize(input).toList().map { it.type })
     }
+
+    @Test
+    fun matchingAtAnOffsetRetainsTheOriginalInputContext() {
+        assertEquals(0, regexToken("\\bMC").match("2MC", 1))
+        assertEquals(2, regexToken("MC").match("2MC", 1))
+        assertEquals(0, regexToken("^hello").match(":hello", 1))
+        assertEquals(5, regexToken("(?<=:)hello").match(":hello", 1))
+    }
 }
